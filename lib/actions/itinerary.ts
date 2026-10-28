@@ -6,15 +6,12 @@ import { itinerarySchema } from "@/lib/validation/itinerary";
 
 export async function createItinerary(formData: FormData) {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   if (!user) redirect("/login");
 
   let daysRaw: unknown = [];
-
   try {
     daysRaw = JSON.parse(String(formData.get("days") || "[]"));
   } catch {
@@ -27,23 +24,15 @@ export async function createItinerary(formData: FormData) {
     startDate: formData.get("startDate"),
     endDate: formData.get("endDate"),
     passengerCount: formData.get("passengerCount"),
-    vehiclePreference:
-      formData.get("vehiclePreference") || undefined,
-    luggageRequirements:
-      formData.get("luggageRequirements") || undefined,
-    specialRequirements:
-      formData.get("specialRequirements") || undefined,
-    additionalNotes:
-      formData.get("additionalNotes") || undefined,
+    vehiclePreference: formData.get("vehiclePreference") || undefined,
+    luggageRequirements: formData.get("luggageRequirements") || undefined,
+    specialRequirements: formData.get("specialRequirements") || undefined,
+    additionalNotes: formData.get("additionalNotes") || undefined,
     days: daysRaw,
   });
 
   if (!parsed.success) {
-    redirect(
-      `/trips/new?error=${encodeURIComponent(
-        parsed.error.issues[0].message
-      )}`
-    );
+    redirect(`/trips/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid input")}`);
   }
 
   const d = parsed.data;
@@ -66,15 +55,12 @@ export async function createItinerary(formData: FormData) {
     .single();
 
   if (error || !itinerary) {
-    redirect(
-      `/trips/new?error=${encodeURIComponent(
-        error?.message ?? "Could not create itinerary"
-      )}`
-    );
+    redirect(`/trips/new?error=${encodeURIComponent(error?.message ?? "Could not create itinerary")}`);
   }
 
   for (let i = 0; i < d.days.length; i++) {
     const day = d.days[i];
+    if (!day) continue;
 
     const { data: dayRow, error: dayError } = await supabase
       .from("itinerary_days")
@@ -87,11 +73,7 @@ export async function createItinerary(formData: FormData) {
       .single();
 
     if (dayError || !dayRow) {
-      redirect(
-        `/trips/new?error=${encodeURIComponent(
-          dayError?.message ?? "Could not save day"
-        )}`
-      );
+      redirect(`/trips/new?error=${encodeURIComponent(dayError?.message ?? "Could not save day")}`);
     }
 
     const stopsPayload = day.stops.map((location, idx) => ({
@@ -100,14 +82,9 @@ export async function createItinerary(formData: FormData) {
       location_name: location,
     }));
 
-    const { error: stopsError } = await supabase
-      .from("itinerary_stops")
-      .insert(stopsPayload);
-
+    const { error: stopsError } = await supabase.from("itinerary_stops").insert(stopsPayload);
     if (stopsError) {
-      redirect(
-        `/trips/new?error=${encodeURIComponent(stopsError.message)}`
-      );
+      redirect(`/trips/new?error=${encodeURIComponent(stopsError.message)}`);
     }
   }
 
